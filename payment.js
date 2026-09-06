@@ -3,6 +3,8 @@ import { loadCart, cartSubtotal, cartHasNonPurchasableItems } from './cart.js';
 
 const PAYPAL_ME_URL = 'https://www.paypal.com/paypalme/1968428713';
 let paypalPromise = null;
+let paypalRenderGeneration = 0;
+let paypalRenderPromise = null;
 
 function payableCartState(productById) {
   const cart = loadCart();
@@ -32,12 +34,12 @@ function ensureStaticPaymentFallback(status, productById) {
   fallback.innerHTML = `
     ${payable
       ? `<a class="paypal-static-button paypal-static-paypal" href="${target}" target="_blank" rel="noopener noreferrer" aria-label="PayPal payment for ${MERCHANT.legalName}">PayPal${amountLabel}</a>
-         <a class="paypal-static-button paypal-static-card" href="${target}" target="_blank" rel="noopener noreferrer" aria-label="Debit or credit card payment for ${MERCHANT.legalName}">💳 ${isEnglish ? 'Card / PayPal' : 'Дебитна / кредитна карта'}${amountLabel}</a>`
+         <a class="paypal-static-button paypal-static-card" href="${target}" target="_blank" rel="noopener noreferrer" aria-label="Debit or credit card payment via PayPal for ${MERCHANT.legalName}">💳 ${isEnglish ? 'Card via PayPal' : 'Карта чрез PayPal'}${amountLabel}</a>`
       : `<button class="paypal-static-button paypal-static-paypal" type="button" disabled aria-disabled="true">PayPal</button>
-         <button class="paypal-static-button paypal-static-card" type="button" disabled aria-disabled="true">💳 ${isEnglish ? 'Card / PayPal' : 'Дебитна / кредитна карта'}</button>`}
+         <button class="paypal-static-button paypal-static-card" type="button" disabled aria-disabled="true">💳 ${isEnglish ? 'Card via PayPal' : 'Карта чрез PayPal'}</button>`}
     <small>${payable
-      ? (isEnglish ? `Secure payment via PayPal.Me. The amount is taken from the payable cart total${amountLabel}.` : `Сигурно плащане чрез PayPal.Me. Сумата се задава автоматично според платимата кошница${amountLabel}.`)
-      : `${disabledLabel}${cart.length ? '.' : '.'}`}</small>`;
+      ? (isEnglish ? `Fallback payment via PayPal.Me. The amount is taken from the payable cart total${amountLabel}.` : `Резервно плащане чрез PayPal.Me. Сумата се задава според платимата кошница${amountLabel}.`)
+      : `${disabledLabel}.`}</small>`;
   fallback.hidden = false;
   fallback.dataset.payable = payable ? 'true' : 'false';
   return fallback;
@@ -100,6 +102,7 @@ export function initCartPayment(productById) {
   const status = document.querySelector('#paypal-status');
   if (!container || !status) return;
 
+  const generation = ++paypalRenderGeneration;
   const fallback = ensureStaticPaymentFallback(status, productById);
   const state = payableCartState(productById);
 
@@ -131,12 +134,16 @@ export function initCartPayment(productById) {
     return;
   }
 
+  if (paypalRenderPromise) return;
+
   status.textContent = document.documentElement.lang === 'en'
     ? 'Loading secure PayPal checkout…'
     : 'Зарежда се сигурният PayPal checkout…';
 
-  loadPayPal(PAYPAL_CLIENT_ID).then(() => {
+  paypalRenderPromise = loadPayPal(PAYPAL_CLIENT_ID).then(() => {
+    if (generation !== paypalRenderGeneration) return;
     if (!window.paypal?.Buttons) throw new Error('PayPal SDK unavailable');
+
     container.innerHTML = '';
     cardContainer.innerHTML = '';
     container.dataset.paypalReady = 'false';
@@ -191,11 +198,14 @@ export function initCartPayment(productById) {
     });
 
     const onError = () => {
+      if (generation !== paypalRenderGeneration) return;
+      container.innerHTML = '';
+      cardContainer.innerHTML = '';
       container.dataset.paypalReady = 'false';
       const current = payableCartState(productById);
       ensureStaticPaymentFallback(status, productById).hidden = false;
       status.textContent = current.payable
-        ? 'PayPal checkout временно не е наличен. Използвай защитеното плащане по сумата на кошницата по-долу.'
+        ? 'PayPal checkout временно не е наличен. Използвай резервното плащане по сумата на кошницата по-долу.'
         : 'Добави платим продукт с валидна EUR цена в кошницата, за да активираш PayPal checkout.';
     };
 
@@ -214,16 +224,24 @@ export function initCartPayment(productById) {
     }
 
     return Promise.all(renderers).then(() => {
+      if (generation !== paypalRenderGeneration) return;
       container.dataset.paypalReady = 'true';
       fallback.hidden = true;
-      status.textContent = 'Плати сигурно с PayPal или с дебитна/кредитна карта.';
+      status.textContent = document.documentElement.lang === 'en'
+        ? 'Pay securely with PayPal or debit/credit card.'
+        : 'Плати сигурно с PayPal или с дебитна/кредитна карта.';
     });
   }).catch(() => {
+    if (generation !== paypalRenderGeneration) return;
+    container.innerHTML = '';
+    document.querySelector('#paypal-card-button-container')?.replaceChildren();
     container.dataset.paypalReady = 'false';
     ensureStaticPaymentFallback(status, productById).hidden = false;
     status.textContent = document.documentElement.lang === 'en'
-      ? 'PayPal checkout is temporarily unavailable. Use the secure cart amount below.'
-      : 'PayPal checkout временно не е наличен. Използвай защитеното плащане по сумата на кошницата по-долу.';
+      ? 'PayPal checkout is temporarily unavailable. Use the secure PayPal.Me amount below.'
+      : 'PayPal checkout временно не е наличен. Използвай резервното плащане по сумата на кошницата по-долу.';
+  }).finally(() => {
+    if (generation === paypalRenderGeneration) paypalRenderPromise = null;
   });
 }
 
@@ -235,7 +253,7 @@ function loadPayPal(clientId) {
     if (existing) {
       if (window.paypal) { resolve(); return; }
       existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', reject, { once: true });
+      existing.addEventListener('error', () => { paypalPromise = null; reject(new Error('PayPal SDK failed to load')); }, { once: true });
       return;
     }
     const script = document.createElement('script');
@@ -243,7 +261,7 @@ function loadPayPal(clientId) {
     script.async = true;
     script.dataset.wagnerPaypal = 'true';
     script.onload = resolve;
-    script.onerror = reject;
+    script.onerror = () => { paypalPromise = null; reject(new Error('PayPal SDK failed to load')); };
     document.head.appendChild(script);
   });
   return paypalPromise;
