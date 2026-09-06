@@ -132,9 +132,10 @@ assert.match(app, /formatPrice/);
 assert.match(app, /product\.description/);
 assert.match(app, /product\.specs/);
 
-assert.match(runtimeFixes, /bindReliableBuyButtons/);
-assert.match(runtimeFixes, /runtime-buy-bound/);
-assert.match(runtimeFixes, /addToCart\(id\)/);
-assert.match(runtimeFixes, /stopImmediatePropagation/);
+// Cart click ownership belongs to app-v2.js. runtime-fixes.js is presentation-only.
+assert.doesNotMatch(runtimeFixes, /bindReliableBuyButtons/);
+assert.doesNotMatch(runtimeFixes, /runtime-buy-bound/);
+assert.doesNotMatch(runtimeFixes, /addToCart\(id\)/);
+assert.doesNotMatch(runtimeFixes, /stopImmediatePropagation/);
 
 console.log('WAGNER source integrity contract passed');
