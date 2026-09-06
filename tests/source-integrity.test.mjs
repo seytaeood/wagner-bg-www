@@ -85,7 +85,7 @@ assert.match(merchant, /KOLMAN EOOD/);
 assert.match(merchant, /kolmaneood@abv\.bg/i);
 assert.match(merchant, /\+359 88 503 9931/);
 assert.match(merchant, /PAYPAL_CLIENT_ID/);
-assert.doesNotMatch(merchant, /SEPANG GROUP ЕООД/);
+assert.doesNotMatch(merchant, /SEPANG GROUP EOOD/);
 assert.doesNotMatch(merchant, /sepanggroupltd@gmail\.com/);
 assert.doesNotMatch(merchant, /\+359 88 579 66 13/);
 
@@ -132,9 +132,12 @@ assert.match(app, /formatPrice/);
 assert.match(app, /product\.description/);
 assert.match(app, /product\.specs/);
 
-assert.match(runtimeFixes, /bindReliableBuyButtons/);
-assert.match(runtimeFixes, /runtime-buy-bound/);
-assert.match(runtimeFixes, /addToCart\(id\)/);
-assert.match(runtimeFixes, /stopImmediatePropagation/);
+// Cart purchase clicks are handled by the single delegated app handler.
+assert.doesNotMatch(runtimeFixes, /bindReliableBuyButtons/);
+assert.doesNotMatch(runtimeFixes, /runtime-buy-bound/);
+assert.doesNotMatch(runtimeFixes, /stopImmediatePropagation/);
+assert.match(app, /button\.dataset\.product/);
+assert.match(app, /addToCart\(id\)/);
+assert.match(app, /openCart\(\)/);
 
 console.log('WAGNER source integrity contract passed');
