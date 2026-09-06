@@ -28,10 +28,11 @@ function ensureStaticPaymentFallback(status, productById) {
 
   const { payable, subtotal, cart, hasQuotes } = payableCartState(productById);
   const isEnglish = document.documentElement.lang === 'en';
+  const amount = payable ? subtotal.toFixed(2) : '';
   const amountLabel = payable
     ? ` €${subtotal.toLocaleString(isEnglish ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '';
-  const target = payable ? `${PAYPAL_ME_URL}/${subtotal.toFixed(2)}EUR` : '';
+  const target = payable ? `${PAYPAL_ME_URL}/${amount}EUR` : '';
   const disabledLabel = hasQuotes
     ? (isEnglish ? 'Payment available after quote confirmation' : 'Плащането е достъпно след потвърждение на офертата')
     : (isEnglish ? 'Add a payable EUR product to activate checkout' : 'Добави платим продукт с EUR цена, за да активираш плащането');
