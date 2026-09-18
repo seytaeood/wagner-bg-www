@@ -305,16 +305,18 @@ export function initCartPayment(productById) {
         renders.push(paypalButton.render(container));
       }
 
-      const cardContainer = ensureCardContainer(container);
-      const cardButton = window.paypal.Buttons({
-        ...options,
-        fundingSource: window.paypal.FUNDING?.CARD,
-        style: { shape: 'rect', layout: 'vertical', label: 'pay' }
-      });
-      if (window.paypal.FUNDING?.CARD && cardButton.isEligible()) {
-        renders.push(cardButton.render(cardContainer));
-      } else {
-        cardContainer.remove();
+      if (window.paypal.FUNDING?.CARD) {
+        const cardContainer = ensureCardContainer(container);
+        const cardButton = window.paypal.Buttons({
+          ...options,
+          fundingSource: window.paypal.FUNDING.CARD,
+          style: { shape: 'rect', layout: 'vertical', label: 'pay' }
+        });
+        if (cardButton.isEligible()) {
+          renders.push(cardButton.render(cardContainer));
+        } else {
+          cardContainer.remove();
+        }
       }
 
       if (!renders.length) {
