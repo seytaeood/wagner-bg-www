@@ -7,7 +7,7 @@ import { EXTRA_PRODUCTS } from './extra-products.js';
 import { CATALOG_ADDITIONS } from './catalog-additions.js';
 import { MERCHANT } from './merchant-config.js';
 import { loadCart, addToCart, setQuantity, removeFromCart, clearCart, cartCount, cartSubtotal, cartHasNonPurchasableItems, cartMailtoBody } from './cart.js';
-import { initCartPayment, renderPaymentSummary } from './payment.js?v=20260830-2335';
+import { initCartPayment, renderPaymentSummary } from './payment.js?v=20260918-1120';
 import { applyLanguage, getLanguage, t } from './i18n.js';
 import { PRODUCT_DESCRIPTIONS_EN } from './product-descriptions-en.js';
 
