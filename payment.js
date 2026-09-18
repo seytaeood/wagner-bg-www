@@ -4,6 +4,11 @@ import { loadCart, cartSubtotal, cartHasNonPurchasableItems, clearCart } from '.
 const PAYPAL_ME_URL = 'https://www.paypal.com/paypalme/1968428713';
 let paypalPromise = null;
 let paypalRenderKey = '';
+let paypalRenderGeneration = 0;
+
+function isEnglish() {
+  return document.documentElement.lang === 'en';
+}
 
 function payableCartState(productById) {
   const cart = loadCart();
@@ -27,23 +32,29 @@ function ensureStaticPaymentFallback(status, productById) {
   }
 
   const { payable, subtotal, cart, hasQuotes } = payableCartState(productById);
-  const isEnglish = document.documentElement.lang === 'en';
   const amount = payable ? subtotal.toFixed(2) : '';
-  const amountLabel = payable
-    ? ` €${subtotal.toLocaleString(isEnglish ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : '';
   const target = payable ? `${PAYPAL_ME_URL}/${amount}EUR` : '';
-  const disabledLabel = hasQuotes
-    ? (isEnglish ? 'Payment available after quote confirmation' : 'Плащането е достъпно след потвърждение на офертата')
-    : (isEnglish ? 'Add a payable EUR product to activate checkout' : 'Добави платим продукт с EUR цена, за да активираш плащането');
+  const amountLabel = payable
+    ? ` €${subtotal.toLocaleString(isEnglish() ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : '';
 
-  fallback.innerHTML = payable
-    ? `<a class="paypal-static-button paypal-static-paypal" href="${target}" target="_blank" rel="noopener noreferrer">PayPal${amountLabel}</a>
-       <a class="paypal-static-button paypal-static-card" href="${target}" target="_blank" rel="noopener noreferrer">💳 ${isEnglish ? 'Card / PayPal' : 'Дебитна / кредитна карта'}${amountLabel}</a>
-       <small>${isEnglish ? 'Secure payment via PayPal.Me. The amount matches the payable cart total.' : 'Сигурно плащане чрез PayPal.Me. Сумата съответства на платимата стойност на кошницата.'}</small>`
-    : `<button class="paypal-static-button paypal-static-paypal" type="button" disabled aria-disabled="true">PayPal</button>
-       <button class="paypal-static-button paypal-static-card" type="button" disabled aria-disabled="true">💳 ${isEnglish ? 'Card / PayPal' : 'Дебитна / кредитна карта'}</button>
-       <small>${disabledLabel}.</small>`;
+  if (payable) {
+    fallback.innerHTML = `
+      <a class="paypal-static-button paypal-static-paypal" href="${target}" target="_blank" rel="noopener noreferrer">
+        PayPal.Me${amountLabel}
+      </a>
+      <small>${isEnglish()
+        ? 'Reserve payment link. It requires a PayPal account; the amount matches the payable cart total.'
+        : 'Резервна връзка за плащане. Необходим е PayPal акаунт; сумата съответства на платимата стойност на кошницата.'}</small>`;
+  } else {
+    const disabledLabel = hasQuotes
+      ? (isEnglish() ? 'Payment is available after quote confirmation.' : 'Плащането е достъпно след потвърждение на офертата.')
+      : (isEnglish() ? 'Add a payable EUR product to activate checkout.' : 'Добави платим продукт с EUR цена, за да активираш плащането.');
+    fallback.innerHTML = `
+      <button class="paypal-static-button paypal-static-paypal" type="button" disabled aria-disabled="true">PayPal</button>
+      <button class="paypal-static-button paypal-static-card" type="button" disabled aria-disabled="true">💳 ${isEnglish() ? 'Debit / credit card' : 'Дебитна / кредитна карта'}</button>
+      <small>${disabledLabel}</small>`;
+  }
 
   fallback.hidden = false;
   fallback.dataset.payable = payable ? 'true' : 'false';
@@ -55,7 +66,7 @@ function ensureCardContainer(container) {
   if (!card) {
     card = document.createElement('div');
     card.id = 'paypal-card-button-container';
-    card.setAttribute('aria-label', 'Debit or credit card payment');
+    card.setAttribute('aria-label', isEnglish() ? 'Debit or credit card payment' : 'Плащане с дебитна или кредитна карта');
     container.insertAdjacentElement('afterend', card);
   }
   return card;
@@ -78,9 +89,9 @@ export function renderPaymentSummary(productById) {
   const totalLabelEl = document.querySelector('#paypal-payment-total-label');
   if (!summary || !itemsEl || !totalEl) return;
 
-  const isEnglish = document.documentElement.lang === 'en';
-  if (titleEl) titleEl.textContent = isEnglish ? 'Payment order' : 'Поръчка за плащане';
-  if (totalLabelEl) totalLabelEl.textContent = isEnglish ? 'Total' : 'Общо';
+  const english = isEnglish();
+  if (titleEl) titleEl.textContent = english ? 'Payment order' : 'Поръчка за плащане';
+  if (totalLabelEl) totalLabelEl.textContent = english ? 'Total' : 'Общо';
 
   const items = loadCart()
     .map((entry) => ({ entry, product: productById(entry.id) }))
@@ -97,19 +108,24 @@ export function renderPaymentSummary(productById) {
   for (const { entry, product } of items) {
     const row = document.createElement('div');
     row.className = 'selected-row';
+
     const name = document.createElement('strong');
     name.textContent = `${product.name}${product.model ? ` · ${product.model}` : ''} × ${entry.quantity}`;
+
     const amount = document.createElement('strong');
     const payable = product.priceKnown && product.priceCurrency === 'EUR' && Number.isFinite(product.price);
     amount.textContent = payable
-      ? `€${(product.price * entry.quantity).toLocaleString(isEnglish ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : (isEnglish ? 'Price on request' : 'Цена при запитване');
+      ? `€${(product.price * entry.quantity).toLocaleString(english ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : (english ? 'Price on request' : 'Цена при запитване');
+
     row.append(name, amount);
     fragment.appendChild(row);
   }
+
   itemsEl.replaceChildren(fragment);
+
   const subtotal = cartSubtotal(productById);
-  totalEl.textContent = `€${subtotal.toLocaleString(isEnglish ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  totalEl.textContent = `€${subtotal.toLocaleString(english ? 'en-GB' : 'bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   summary.hidden = false;
 }
 
@@ -118,30 +134,36 @@ export function initCartPayment(productById) {
   const status = document.querySelector('#paypal-status');
   if (!container || !status) return;
 
-  const fallback = ensureStaticPaymentFallback(status, productById);
   const state = payableCartState(productById);
   const key = cartRenderKey(productById);
+  const fallback = ensureStaticPaymentFallback(status, productById);
+
+  // Every re-initialization invalidates an older asynchronous SDK render.
+  const generation = ++paypalRenderGeneration;
 
   if (!state.payable) {
     container.replaceChildren();
-    document.querySelector('#paypal-card-button-container')?.replaceChildren();
     document.querySelector('#paypal-card-button-container')?.remove();
     container.dataset.paypalReady = 'false';
+    container.dataset.paypalLoading = 'false';
     paypalRenderKey = '';
     fallback.hidden = false;
     status.textContent = state.hasQuotes
-      ? (document.documentElement.lang === 'en' ? 'The cart contains a quote-based product. Confirm the final amount before payment.' : 'Кошницата съдържа продукт с цена при запитване. Потвърди крайната сума преди плащане.')
-      : (document.documentElement.lang === 'en' ? 'Add a payable EUR product to activate PayPal checkout.' : 'Добави платим продукт с валидна EUR цена в кошницата, за да активираш PayPal checkout.');
+      ? (isEnglish() ? 'The cart contains a quote-based product. Confirm the final amount before payment.' : 'Кошницата съдържа продукт с цена при запитване. Потвърди крайната сума преди плащане.')
+      : (isEnglish() ? 'Add a payable EUR product to activate PayPal checkout.' : 'Добави платим продукт с валидна EUR цена в кошницата, за да активираш PayPal checkout.');
     return;
   }
 
   if (!PAYPAL_CLIENT_ID) {
     container.replaceChildren();
+    document.querySelector('#paypal-card-button-container')?.remove();
     container.dataset.paypalReady = 'false';
+    container.dataset.paypalLoading = 'false';
+    paypalRenderKey = '';
     fallback.hidden = false;
     status.textContent = isEnglish()
-      ? 'PayPal checkout is unavailable; use the secure PayPal.Me amount below.'
-      : 'PayPal checkout временно не е наличен; използвай защитеното плащане по сумата на кошницата по-долу.';
+      ? 'PayPal checkout is unavailable; use the secure PayPal.Me reserve link below.'
+      : 'PayPal checkout временно не е наличен; използвай резервната защитена PayPal.Me връзка по-долу.';
     return;
   }
 
@@ -150,7 +172,9 @@ export function initCartPayment(productById) {
     return;
   }
 
-  if (container.dataset.paypalLoading === 'true' && paypalRenderKey === key) return;
+  if (container.dataset.paypalLoading === 'true' && paypalRenderKey === key) {
+    return;
+  }
 
   container.replaceChildren();
   document.querySelector('#paypal-card-button-container')?.remove();
@@ -162,14 +186,8 @@ export function initCartPayment(productById) {
 
   loadPayPal(PAYPAL_CLIENT_ID)
     .then(() => {
+      if (generation !== paypalRenderGeneration || cartRenderKey(productById) !== key) return false;
       if (!window.paypal?.Buttons) throw new Error('PayPal SDK unavailable');
-
-      const currentKey = cartRenderKey(productById);
-      if (currentKey !== key) {
-        container.dataset.paypalLoading = 'false';
-        initCartPayment(productById);
-        return;
-      }
 
       const validateCart = () => {
         const current = payableCartState(productById);
@@ -190,13 +208,19 @@ export function initCartPayment(productById) {
             quantity: String(entry.quantity)
           };
         });
+
         return actions.order.create({
           purchase_units: [{
             description: `WAGNER-BG order — ${MERCHANT.legalName}`,
             amount: {
               currency_code: 'EUR',
               value: subtotal.toFixed(2),
-              breakdown: { item_total: { currency_code: 'EUR', value: subtotal.toFixed(2) } }
+              breakdown: {
+                item_total: {
+                  currency_code: 'EUR',
+                  value: subtotal.toFixed(2)
+                }
+              }
             },
             items
           }]
@@ -216,8 +240,15 @@ export function initCartPayment(productById) {
       };
 
       const onApprove = (data, actions) => actions.order.capture()
-        .then(() => {
+        .then((details) => {
           const orderId = data?.orderID || '';
+          const captureStatus = details?.status
+            || details?.purchase_units?.[0]?.payments?.captures?.[0]?.status;
+
+          if (captureStatus && captureStatus !== 'COMPLETED') {
+            throw new Error(`Unexpected PayPal capture status: ${captureStatus}`);
+          }
+
           clearCart();
           renderPaymentSummary(productById);
           container.replaceChildren();
@@ -233,8 +264,9 @@ export function initCartPayment(productById) {
         .catch((error) => {
           console.error('PayPal capture failed:', error);
           status.textContent = isEnglish()
-            ? 'PayPal could not complete the payment. Please try again.'
-            : 'PayPal не успя да завърши плащането. Моля, опитай отново.';
+            ? 'PayPal could not complete the payment. Your cart was not cleared. Please try again.'
+            : 'PayPal не успя да завърши плащането. Кошницата не е изчистена. Моля, опитай отново.';
+          throw error;
         });
 
       const onCancel = () => {
@@ -247,13 +279,14 @@ export function initCartPayment(productById) {
         console.error('PayPal checkout error:', error);
         container.dataset.paypalReady = 'false';
         container.dataset.paypalLoading = 'false';
+        paypalRenderKey = '';
         ensureStaticPaymentFallback(status, productById).hidden = false;
         status.textContent = isEnglish()
-          ? 'PayPal checkout is temporarily unavailable. Use the secure payment amount below.'
-          : 'PayPal checkout временно не е наличен. Използвай защитеното плащане по сумата на кошницата по-долу.';
+          ? 'PayPal checkout is temporarily unavailable. Use the secure reserve payment link below.'
+          : 'PayPal checkout временно не е наличен. Използвай резервната защитена връзка за плащане по-долу.';
       };
 
-      const baseOptions = {
+      const options = {
         style: { shape: 'rect', color: 'gold', layout: 'vertical', label: 'pay' },
         createOrder,
         onClick,
@@ -262,29 +295,36 @@ export function initCartPayment(productById) {
         onError
       };
 
-      const paypalButton = window.paypal.Buttons(baseOptions);
       const renders = [];
-      if (paypalButton.isEligible()) renders.push(paypalButton.render(container));
 
-      if (window.paypal.FUNDING?.CARD) {
-        const cardButton = window.paypal.Buttons({
-          fundingSource: window.paypal.FUNDING.CARD,
-          style: { shape: 'rect', layout: 'vertical', label: 'pay' },
-          createOrder,
-          onClick,
-          onApprove,
-          onCancel,
-          onError
-        });
-        if (cardButton.isEligible()) {
-          renders.push(cardButton.render(ensureCardContainer(container)));
-        }
+      const paypalButton = window.paypal.Buttons({
+        ...options,
+        fundingSource: window.paypal.FUNDING?.PAYPAL
+      });
+      if (paypalButton.isEligible()) {
+        renders.push(paypalButton.render(container));
       }
 
-      if (!renders.length) throw new Error('No eligible PayPal funding source');
-      return Promise.all(renders);
+      const cardContainer = ensureCardContainer(container);
+      const cardButton = window.paypal.Buttons({
+        ...options,
+        fundingSource: window.paypal.FUNDING?.CARD,
+        style: { shape: 'rect', layout: 'vertical', label: 'pay' }
+      });
+      if (window.paypal.FUNDING?.CARD && cardButton.isEligible()) {
+        renders.push(cardButton.render(cardContainer));
+      } else {
+        cardContainer.remove();
+      }
+
+      if (!renders.length) {
+        throw new Error('No eligible PayPal funding source');
+      }
+
+      return Promise.all(renders).then(() => true);
     })
-    .then(() => {
+    .then((rendered) => {
+      if (!rendered || generation !== paypalRenderGeneration || cartRenderKey(productById) !== key) return;
       container.dataset.paypalLoading = 'false';
       container.dataset.paypalReady = 'true';
       fallback.hidden = true;
@@ -293,19 +333,16 @@ export function initCartPayment(productById) {
         : 'Плати сигурно с PayPal или с дебитна/кредитна карта.';
     })
     .catch((error) => {
+      if (generation !== paypalRenderGeneration) return;
       console.error('PayPal initialization failed:', error);
       container.dataset.paypalReady = 'false';
       container.dataset.paypalLoading = 'false';
       paypalRenderKey = '';
       ensureStaticPaymentFallback(status, productById).hidden = false;
       status.textContent = isEnglish()
-        ? 'PayPal checkout is temporarily unavailable. Use the secure payment amount below.'
-        : 'PayPal checkout временно не е наличен. Използвай защитеното плащане по сумата на кошницата по-долу.';
+        ? 'PayPal checkout is temporarily unavailable. Use the secure reserve payment link below.'
+        : 'PayPal checkout временно не е наличен. Използвай резервната защитена връзка за плащане по-долу.';
     });
-}
-
-function isEnglish() {
-  return document.documentElement.lang === 'en';
 }
 
 function loadPayPal(clientId) {
@@ -325,7 +362,7 @@ function loadPayPal(clientId) {
     }
 
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=EUR&intent=capture&components=buttons&enable-funding=card`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=EUR&intent=capture&commit=true&components=buttons,funding-eligibility&enable-funding=card`;
     script.async = true;
     script.dataset.wagnerPaypal = 'true';
     script.onload = () => resolve();
@@ -336,5 +373,6 @@ function loadPayPal(clientId) {
   paypalPromise.catch(() => {
     paypalPromise = null;
   });
+
   return paypalPromise;
 }
