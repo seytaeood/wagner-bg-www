@@ -7,4 +7,4 @@ export const MERCHANT = {
 };
 
 // Public PayPal Client ID. Never place a PayPal Client Secret in frontend code.
-export const PAYPAL_CLIENT_ID = 'BAAwAOX8YivoshgOb4bR9FIueXriBgZtXSzkmpAc0itgZ50Wuon3gnhAV-uPJWeKhNGCIS87S768';
+export const PAYPAL_CLIENT_ID = 'BAAwAOX8YivoshgObV1N0aA4bR9FIueXriBgZtXSzkmpAc0itgZ50Wuon3gnhAV-uPJWeKhNGCIS87S768';
