@@ -27,6 +27,13 @@ assert.match(payment, /type="button" disabled/);
 assert.match(payment, /dataset\.payable/);
 assert.match(payment, /container\.dataset\.paypalReady = 'false'/);
 assert.match(payment, /Loading secure PayPal checkout/);
+assert.match(payment, /funding-eligibility/);
+assert.match(payment, /FUNDING\\.PAYPAL/);
+assert.match(payment, /FUNDING\\.CARD/);
+assert.match(payment, /paypalRenderGeneration/);
+assert.match(payment, /clearCart/);
+assert.match(payment, /onCancel/);
+assert.match(payment, /commit=true/);
 
 // Regression: a browser storage failure must not prevent a product from entering the cart.
 globalThis.localStorage = {
